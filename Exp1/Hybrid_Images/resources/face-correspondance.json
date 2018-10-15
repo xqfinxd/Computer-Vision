@@ -1,0 +1,32 @@
+{
+  "first_image_points": [
+    [
+      76.0,
+      100.0
+    ],
+    [
+      115.0,
+      98.0
+    ],
+    [
+      89.0,
+      125.0
+    ]
+  ],
+  "second_image_points": [
+    [
+      81.0,
+      93.5
+    ],
+    [
+      123.0,
+      87.5
+    ],
+    [
+      96.0,
+      111.0
+    ]
+  ],
+  "first_image": "resources/faceA.jpg",
+  "second_image": "resources/faceB.jpg"
+}
