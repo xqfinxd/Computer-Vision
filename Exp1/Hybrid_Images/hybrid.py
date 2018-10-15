@@ -3,6 +3,7 @@ sys.path.append('/Users/kb/bin/opencv-3.1.0/build/lib/')
 
 import cv2
 import numpy as np
+import math
 
 def cross_correlation_2d(img, kernel):
     '''Given a kernel of arbitrary m x n dimensions, with both m and n being
@@ -23,8 +24,44 @@ def cross_correlation_2d(img, kernel):
         height and the number of color channels)
     '''
     # TODO-BLOCK-BEGIN
-    raise Exception("TODO in hybrid.py not implemented")
+    # raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
+    result = np.copy(img)
+    [height_kernel, width_kernel] = kernel.shape
+    height_extra = (height_kernel-1)/2
+    width_extra = (width_kernel-1)/2
+    if img.ndim == 3 :
+        #RGB image
+        [height_img, width_img, rgb] = img.shape
+        imgcp = np.zeros((height_img+2*height_extra, width_img+2*width_extra))
+        for color in range(rgb) :
+            for i in range(height_img) :
+                for j in range(width_img) :
+                    imgcp[i+height_extra, j+width_extra] = img[i, j, color]
+            for i in range(height_img): 
+                for j in range(width_img) :
+                    count = 0
+                    for m in range(height_kernel) :
+                        for n in range(width_kernel) :
+                            count += imgcp[i+m, j+n]*kernel[m, n]
+                    result[i, j, color] = count
+        return result
+    else :
+        #Gray image
+        [height_img, width_img] = img.shape
+        imgcp = np.zeros((height_img+2*height_extra, width_img+2*width_extra))
+        for i in range(height_img) :
+            for j in range(width_img) :
+                imgcp[i+height_extra, j+width_extra] = img[i, j]
+        for i in range(height_img): 
+            for j in range(width_img) :
+                count = 0
+                for m in range(height_kernel) :
+                    for n in range(width_kernel) :
+                        count += imgcp[i+m, j+n]*kernel[m, n]
+                result[i, j] = count
+        return result
+
 
 def convolve_2d(img, kernel):
     '''Use cross_correlation_2d() to carry out a 2D convolution.
@@ -40,8 +77,18 @@ def convolve_2d(img, kernel):
         height and the number of color channels)
     '''
     # TODO-BLOCK-BEGIN
-    raise Exception("TODO in hybrid.py not implemented")
+    # raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
+    kernelcp = kernel.copy()
+    [h, w] = kernel.shape
+    h_index = h-1
+    w_index = w-1
+    for i in range(h) :
+        for j in range(w) :
+            kernelcp[i, j] = kernel[h_index-i, w_index-j]
+    return cross_correlation_2d(img, kernelcp)
+
+
 
 def gaussian_blur_kernel_2d(sigma, height, width):
     '''Return a Gaussian blur kernel of the given dimensions and with the given
@@ -59,8 +106,26 @@ def gaussian_blur_kernel_2d(sigma, height, width):
         with an image results in a Gaussian-blurred image.
     '''
     # TODO-BLOCK-BEGIN
-    raise Exception("TODO in hybrid.py not implemented")
+    # raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
+    total = 0.0
+    pi = 3.1415926
+    height_half = (height-1)/2
+    width_half = (width-1)/2
+    sigma_2_2 = sigma*sigma*2.0
+    result = np.zeros((height, width))
+
+    for i in range(height) :
+        for j in range(width) :
+            result[i, j] = math.exp(-(((i-height_half)**2) + (j-width_half)**2) / sigma_2_2) / (sigma_2_2*pi)
+            total += result[i, j]
+    
+    for i in range(height) :
+        for j in range(width) :
+            result[i, j] /= total
+
+    return result
+
 
 def low_pass(img, sigma, size):
     '''Filter the image as if its filtered with a low pass filter of the given
@@ -72,8 +137,10 @@ def low_pass(img, sigma, size):
         height and the number of color channels)
     '''
     # TODO-BLOCK-BEGIN
-    raise Exception("TODO in hybrid.py not implemented")
+    # raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
+    return convolve_2d(img, gaussian_blur_kernel_2d(sigma, size, size))
+
 
 def high_pass(img, sigma, size):
     '''Filter the image as if its filtered with a high pass filter of the given
@@ -85,8 +152,23 @@ def high_pass(img, sigma, size):
         height and the number of color channels)
     '''
     # TODO-BLOCK-BEGIN
-    raise Exception("TODO in hybrid.py not implemented")
+    # raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
+    img_lowpass = low_pass(img, sigma, size)
+    img_highpass = np.copy(img)
+    if img.ndim == 3 :
+        [height, width, color] = img.shape
+        for c in range(color) :
+            for x in range(height) :
+                for y in range(width) :
+                    img_highpass[x, y, c] = img[x, y, c] - img_lowpass[x, y, c]
+    else :
+        [height, width] = img.shape
+        for x in range(height) :
+            for y in range(width) :
+                img_highpass[x, y] = img[x, y] - img_lowpass[x, y]
+
+    return img_highpass
 
 def create_hybrid_image(img1, img2, sigma1, size1, high_low1, sigma2, size2,
         high_low2, mixin_ratio):
