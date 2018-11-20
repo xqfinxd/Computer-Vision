@@ -383,8 +383,91 @@ class MOPSFeatureDescriptor(FeatureDescriptor):
                         count+=1
 
             # TODO-BLOCK-END
+        print(desc.shape)
         return desc
 
+    def describeFeaturesWithSIFT(self, image, fill = None):
+        image = image.astype(np.float32)
+        image /= 255.
+        windowSize = 8
+        grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#           grayImage = ndimage.gaussian_filter(grayImage, 0.5)
+        height, width = grayImage.shape
+        scaleRate = [0.25, 0.5, 1.0, 2.0, 4.0]
+        imgList = []
+        harrisList = []
+        orienList = []
+        maxboolList = []
+        keypoints = []
+        keypointsScale = []
+        for i, s in enumerate(scaleRate):
+            newImg = cv2.resize(grayImage, None, fx=s, fy=s, interpolation=cv2.INTER_LINEAR)
+            imgList.append(newImg)
+        for i, img in enumerate(imgList): 
+            hkd = HarrisKeypointDetector()
+            hv, orie = hkd.computeHarrisValues(img)
+            mb = hkd.computeLocalMaxima(hv)
+            harrisList.append(hv)
+            orienList.append(orie)
+            maxboolList.append(mb)
+        for h in range(0, height):
+            for w in range(0, width):
+                tmpHarris = []
+                tmpIdx = []
+                tmpOri = []
+                for i, s in enumerate(scaleRate):
+                    scaleMat = np.array([[s, 0], [0, s]], dtype = np.int)
+                    point = np.array([w, h], dtype = np.int)
+                    point = np.dot(point, scaleMat)
+                    y, x = point
+                    if maxboolList[i][y, x]:
+                        tmpHarris.append(harrisList[i][y, x])
+                        tmpOri.append(orienList[i][y, x])
+                        tmpIdx.append(s)
+                if len(tmpHarris) > 0:
+                    keypoint = cv2.KeyPoint()
+                    keypoint.size = 10
+                    Idx = np.argmax(tmpHarris)
+                    keypoint.response = tmpHarris[Idx]
+                    keypoint.pt = (w, h)
+                    keypoint.angle = tmpOri[Idx]
+                    keypoints.append(keypoint)
+                    keypointsScale.append(tmpIdx[Idx])
+
+        desc = np.zeros((len(keypoints), windowSize * windowSize))
+
+        for i, f in enumerate(keypoints):
+            transMx = np.zeros((2, 3))
+            x, y = f.pt
+            transMx1 = np.array([[1, 0, 0], [0, 1, 0], [-x, -y, 1]])
+            angle = math.radians(360.0 - f.angle)
+            rotateMx = np.array([[math.cos(angle), math.sin(angle), 0], [-math.sin(angle), math.cos(angle), 0], [0, 0, 1]])
+            ###CHANGED HERE : scaleMx
+            scaleMx = np.array([[0.2*keypointsScale[i], 0.0, 0], [0.0, 0.2*keypointsScale[i], 0], [0, 0, 1]])  
+            transMx2 = np.array([[1, 0], [0, 1], [4, 4]])
+            tMx = np.dot(transMx1, rotateMx)
+            tMx = np.dot(tMx, scaleMx)
+            tMx = np.dot(tMx, transMx2)
+            transMx = np.transpose(tMx)
+
+            destImage = cv2.warpAffine(grayImage, transMx,
+                (windowSize, windowSize), flags=cv2.INTER_LINEAR)
+
+            st = np.std(destImage)
+            count = 0
+            if(st < 1.0e-5):
+                for h in range(0, windowSize):
+                    for w in range(0, windowSize):
+                        desc[i, count] = 0.0
+                        count+=1
+            else:
+                me = np.mean(destImage)
+                for h in range(0, windowSize):
+                    for w in range(0, windowSize):
+                        desc[i, count] = (destImage[h, w]-me) / st
+                        count+=1
+        print(desc.shape)
+        return desc
 class ORBFeatureDescriptor(KeypointDetector):
     def describeFeatures(self, image, keypoints):
         '''
