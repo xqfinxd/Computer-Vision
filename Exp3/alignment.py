@@ -42,7 +42,14 @@ def computeHomography(f1, f2, matches, A_out=None):
         #Fill in the matrix A in this loop.
         #Access elements using square brackets. e.g. A[0,0]
         #TODO-BLOCK-BEGIN
-        raise Exception("TODO in alignment.py not implemented")
+        # raise Exception("TODO in alignment.py not implemented")
+
+        temp = np.zeros((2, 9))
+        temp[0] = [a_x, a_y, 1, 0, 0, 0, -b_x*a_x, -b_x*a_y, -b_x]
+        temp[1] = [0, 0, 0, a_x, a_y, 1, -b_y*a_x, -b_y*a_y, -b_y]
+        A[2*i]   = temp[0]
+        A[2*i+1] = temp[1]
+        
         #TODO-BLOCK-END
         #END TODO
 
@@ -62,7 +69,12 @@ def computeHomography(f1, f2, matches, A_out=None):
     #BEGIN TODO 3
     #Fill the homography H with the appropriate elements of the SVD
     #TODO-BLOCK-BEGIN
-    raise Exception("TODO in alignment.py not implemented")
+    # raise Exception("TODO in alignment.py not implemented")
+
+    # I don't know why do this when (s.shape[0] < 9)
+    matMin = Vt[8]
+    H = np.reshape(matMin, (3,3))
+
     #TODO-BLOCK-END
     #END TODO
 
@@ -103,7 +115,33 @@ def alignPair(f1, f2, matches, m, nRANSAC, RANSACthresh):
     #This function should also call get_inliers and, at the end,
     #least_squares_fit.
     #TODO-BLOCK-BEGIN
-    raise Exception("TODO in alignment.py not implemented")
+    # raise Exception("TODO in alignment.py not implemented")
+
+    matR = np.eye(3)
+    numAll = []
+    mAll = []
+    inlAll = []
+    for i in range(nRANSAC):
+        if m == eTranslate:
+            match1 = random.sample(matches, 1)
+            (a_x, a_y) = f1[match1.queryIdx].pt
+            (b_x, b_y) = f2[match1.trainIdx].pt
+            d_x = b_x-a_x
+            d_y = b_y-a_y
+            matR[0,2] = d_x
+            matR[1,2] = d_y
+        else:
+            match4 = random.sample(matches, 4)
+            matR = computeHomography(f1, f2, match4)
+        inl = getInliers(f1, f2, matches, matR, RANSACthresh)
+        inlAll.append(inl)
+        numAll.append(len(inl))
+        mAll.append(matR)
+    idxMax = np.argmax(numAll)
+    tempM = mAll[idxMax]
+    inl = inlAll[idxMax]
+    M = leastSquaresFit(f1, f2, matches, m, inl)
+    
     #TODO-BLOCK-END
     #END TODO
     return M
@@ -138,7 +176,18 @@ def getInliers(f1, f2, matches, M, RANSACthresh):
         #by M, is within RANSACthresh of its match in f2.
         #If so, append i to inliers
         #TODO-BLOCK-BEGIN
-        raise Exception("TODO in alignment.py not implemented")
+        # raise Exception("TODO in alignment.py not implemented")
+
+        m = matches[i]
+        (a_x, a_y) = f1[m.queryIdx].pt
+        (b_x, b_y) = f2[m.trainIdx].pt
+        a_mat = np.array([[a_x, a_y, 1]]).T
+        b_mat = np.array([[b_x, b_y, 1]]).T
+        a_trans = np.dot(M, a_mat)
+        dist = np.linalg.norm(b_mat - a_trans)
+        if dist < RANSACthresh:
+            inlier_indices.append(i)
+
         #TODO-BLOCK-END
         #END TODO
 
@@ -183,7 +232,13 @@ def leastSquaresFit(f1, f2, matches, m, inlier_indices):
             #Use this loop to compute the average translation vector
             #over all inliers.
             #TODO-BLOCK-BEGIN
-            raise Exception("TODO in alignment.py not implemented")
+            # raise Exception("TODO in alignment.py not implemented")
+
+            (ax, ay) = f1[matches[inlier_indices[i]].queryIdx].pt
+            (bx, by) = f2[matches[inlier_indices[i]].trainIdx].pt
+            u += bx - ax
+            v += by - ay
+
             #TODO-BLOCK-END
             #END TODO
 
@@ -198,7 +253,13 @@ def leastSquaresFit(f1, f2, matches, m, inlier_indices):
         #Compute a homography M using all inliers.
         #This should call computeHomography.
         #TODO-BLOCK-BEGIN
-        raise Exception("TODO in alignment.py not implemented")
+        # raise Exception("TODO in alignment.py not implemented")
+
+        matchNew = []
+        for i in range(len(inlier_indices)):
+            matchNew.append(matches[inlier_indices[i]])
+        M = computeHomography(f1, f2, matchNew)
+
         #TODO-BLOCK-END
         #END TODO
 
