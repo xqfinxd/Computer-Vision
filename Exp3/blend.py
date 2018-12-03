@@ -64,7 +64,34 @@ def accumulateBlend(img, acc, M, blendWidth):
     # BEGIN TODO 10
     # Fill in this routine
     #TODO-BLOCK-BEGIN
-    raise Exception("TODO in blend.py not implemented")
+    # raise Exception("TODO in blend.py not implemented")
+
+    maxh, maxw, ca = acc.shape
+    height, width, ci = img.shape
+    minX, minY, maxX, maxY = imageBoundingBox(img, M)
+    invM = np.linalg.inv(M)
+    for i in range(maxh):
+    	for j in range(maxw):
+    		matp = np.array([[j, i, 1]]).T
+    		matp = np.dot(invM, matp)
+    		x = matp[0]/matp[2]
+    		y = matp[1]/matp[2]
+    		if (x<0) or (x>width-1) or (y<0) or (y>height-1):
+    			continue
+    		if img[x, y, 0]+img[x, y, 1]+img[x, y, 2]==0:
+    			continue
+    		minVxy = min(x, width-1-x, y, height-1-y)
+    		weight = 0.0
+    		if minVxy<blendWidth:
+    			weight+=1.0*minVxy/blendWidth
+    		else:
+    			weight+=1.0
+    		acc[i, j, 0] += img[x, y, 0]*weight
+    		acc[i, j, 1] += img[x, y, 1]*weight
+    		acc[i, j, 2] += img[x, y, 2]*weight
+    		acc[i, j, 3] += weight
+    
+    return acc
     #TODO-BLOCK-END
     # END TODO
 
@@ -80,7 +107,22 @@ def normalizeBlend(acc):
     # BEGIN TODO 11
     # fill in this routine..
     #TODO-BLOCK-BEGIN
-    raise Exception("TODO in blend.py not implemented")
+    # raise Exception("TODO in blend.py not implemented")
+
+    height, width, channel = acc.shape
+    img = np.zeros(height, width, channel-1)
+    for i in range(height):
+    	for j in range(width):
+    		weight = acc[i, j, 3]
+    		if weight == 0:
+    			img[i, j, 0] = 0
+    			img[i, j, 1] = 0
+    			img[i, j, 2] = 0
+    		else:
+    			img[i, j, 0] = acc[i, j, 0]/weight
+    			img[i, j, 1] = acc[i, j, 1]/weight
+    			img[i, j, 2] = acc[i, j, 2]/weight
+
     #TODO-BLOCK-END
     # END TODO
     return img
@@ -221,7 +263,13 @@ def blendImages(ipv, blendWidth, is360=False, A_out=None):
     # Note: warpPerspective does forward mapping which means A is an affine
     # transform that maps accumulator coordinates to final panorama coordinates
     #TODO-BLOCK-BEGIN
-    raise Exception("TODO in blend.py not implemented")
+    # raise Exception("TODO in blend.py not implemented")
+
+    if is360:
+    	a = -1.0*(y_final-y_init)/(x_final-x_init)
+    	A[1, 0] = a
+    	A[0, 2] = -0.5*width
+
     #TODO-BLOCK-END
     # END TODO
 

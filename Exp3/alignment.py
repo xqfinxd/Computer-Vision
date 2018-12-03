@@ -123,7 +123,7 @@ def alignPair(f1, f2, matches, m, nRANSAC, RANSACthresh):
     inlAll = []
     for i in range(nRANSAC):
         if m == eTranslate:
-            match1 = random.sample(matches, 1)
+            match1 = random.choice(matches)
             (a_x, a_y) = f1[match1.queryIdx].pt
             (b_x, b_y) = f2[match1.trainIdx].pt
             d_x = b_x-a_x
@@ -169,7 +169,6 @@ def getInliers(f1, f2, matches, M, RANSACthresh):
     '''
 
     inlier_indices = []
-
     for i in range(len(matches)):
         #BEGIN TODO 5
         #Determine if the ith matched feature f1[id1], when transformed
@@ -184,6 +183,9 @@ def getInliers(f1, f2, matches, M, RANSACthresh):
         a_mat = np.array([[a_x, a_y, 1]]).T
         b_mat = np.array([[b_x, b_y, 1]]).T
         a_trans = np.dot(M, a_mat)
+        a_trans[0,0] = a_trans[0,0]/a_trans[2,0]
+        a_trans[1,0] = a_trans[1,0]/a_trans[2,0]
+        a_trans[2,0] = 1
         dist = np.linalg.norm(b_mat - a_trans)
         if dist < RANSACthresh:
             inlier_indices.append(i)
@@ -258,6 +260,8 @@ def leastSquaresFit(f1, f2, matches, m, inlier_indices):
         matchNew = []
         for i in range(len(inlier_indices)):
             matchNew.append(matches[inlier_indices[i]])
+        if len(matchNew)<4:
+            return None
         M = computeHomography(f1, f2, matchNew)
 
         #TODO-BLOCK-END
