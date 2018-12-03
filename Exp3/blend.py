@@ -32,19 +32,29 @@ def imageBoundingBox(img, M):
     # raise Exception("TODO in blend.py not implemented")
 
     h, w = img.shape[:2]
-    matX = []
-    matY = []
-    for i in range(h):
-    	for j in range(w):
-    		p = np.array([[j, i, 1]]).T
-    		p = np.dot(M, p)
-    		matX.append(1.0*p[0]/p[2])
-    		matY.append(1.0*p[1]/p[2])
-    minX = min(matX)
-    maxX = max(matX)
-    minY = min(matY)
-    maxY = max(matY)
+    topleft = np.array([[0, 0, 1]]).T
+    buttomleft = np.array([[0, h-1, 1]]).T
+    topright = np.array([[w-1, 0, 1]]).T
+    buttomright = np.array([[w-1, h-1, 1]]).T
+    topleft = np.dot(M, topleft)
+    topright = np.dot(M, topright)
+    buttomleft = np.dot(M, buttomleft)
+    buttomright = np.dot(M, buttomright)
+    xlist = []
+    ylist = []
+    xlist.append(topright[0]/topright[2])
+    xlist.append(topleft[0]/topleft[2])
+    xlist.append(buttomright[0]/buttomright[2])
+    xlist.append(buttomleft[0]/buttomleft[2])
+    ylist.append(topright[1]/topright[2])
+    ylist.append(topleft[1]/topleft[2])
+    ylist.append(buttomright[1]/buttomright[2])
+    ylist.append(buttomleft[1]/buttomleft[2])
 
+    minX = min(xlist)
+    maxX = max(xlist)
+    minY = min(ylist)
+    maxY = max(ylist)
     #TODO-BLOCK-END
     return int(minX), int(minY), int(maxX), int(maxY)
 
@@ -68,17 +78,17 @@ def accumulateBlend(img, acc, M, blendWidth):
 
     maxh, maxw, ca = acc.shape
     height, width, ci = img.shape
-    minX, minY, maxX, maxY = imageBoundingBox(img, M)
     invM = np.linalg.inv(M)
     for i in range(maxh):
     	for j in range(maxw):
     		matp = np.array([[j, i, 1]]).T
     		matp = np.dot(invM, matp)
-    		x = matp[0]/matp[2]
-    		y = matp[1]/matp[2]
+    		x = int(matp[0]/matp[2])
+    		y = int(matp[1]/matp[2])
     		if (x<0) or (x>width-1) or (y<0) or (y>height-1):
     			continue
-    		if img[x, y, 0]+img[x, y, 1]+img[x, y, 2]==0:
+    		sumpix = int(img[y, x, 0])+int(img[y, x, 1])+int(img[y, x, 2])
+    		if sumpix==0:
     			continue
     		minVxy = min(x, width-1-x, y, height-1-y)
     		weight = 0.0
@@ -86,9 +96,9 @@ def accumulateBlend(img, acc, M, blendWidth):
     			weight+=1.0*minVxy/blendWidth
     		else:
     			weight+=1.0
-    		acc[i, j, 0] += img[x, y, 0]*weight
-    		acc[i, j, 1] += img[x, y, 1]*weight
-    		acc[i, j, 2] += img[x, y, 2]*weight
+    		acc[i, j, 0] += img[y, x, 0]*weight
+    		acc[i, j, 1] += img[y, x, 1]*weight
+    		acc[i, j, 2] += img[y, x, 2]*weight
     		acc[i, j, 3] += weight
     
     return acc
@@ -110,7 +120,7 @@ def normalizeBlend(acc):
     # raise Exception("TODO in blend.py not implemented")
 
     height, width, channel = acc.shape
-    img = np.zeros(height, width, channel-1)
+    img = np.zeros((height, width, channel-1))
     for i in range(height):
     	for j in range(width):
     		weight = acc[i, j, 3]
@@ -280,6 +290,6 @@ def blendImages(ipv, blendWidth, is360=False, A_out=None):
     croppedImage = cv2.warpPerspective(
         compImage, A, (outputWidth, accHeight), flags=cv2.INTER_LINEAR
     )
-
+    croppedImage = croppedImage.astype(np.uint8)
     return croppedImage
 
