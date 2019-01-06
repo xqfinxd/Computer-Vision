@@ -48,7 +48,7 @@ def compute_photometric_stereo_impl(lights, images):
                 else:
                     N = G / np.linalg.norm(G)
                 albedo[h, w, c] = kd
-                normals[w, h, :] = N.reshape(-1, 3)
+                normals[h, w, :] = N.reshape(-1, 3)
     return albedo, normals
 
 def project_impl(K, Rt, points):
