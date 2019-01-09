@@ -35,7 +35,7 @@ def compute_photometric_stereo_impl(lights, images):
     # raise NotImplementedError()
     height, width, channel = images[0].shape
     albedo = np.zeros((height, width, channel))
-    normals = np.zeros((height, width, channel))
+    normals = np.zeros((height, width, 3))
     for h in range(height):
         for w in range(width):
             for c in range(channel):
@@ -48,7 +48,7 @@ def compute_photometric_stereo_impl(lights, images):
                 else:
                     N = G / np.linalg.norm(G)
                 albedo[h, w, c] = kd
-                normals[h, w, :] = N.reshape(-1, 3)
+                normals[h, w] = N.reshape(-1)
     return albedo, normals
 
 def project_impl(K, Rt, points):
@@ -131,23 +131,25 @@ def preprocess_ncc_impl(image, ncc_size):
     # raise NotImplementedError()
     height, width, channel = image.shape
     size2 = ncc_size * ncc_size
-    mat = np.zeros((height, width, channel*size2))
-    pos = ncc_size/2
-    neg = -ncc_size/2
+    normalized = np.zeros((height, width, channel*size2))
+    ncc = ncc_size/2
     for h in range(height):
         for w in range(width):
-            if h+neg >= 0 and w+neg >= 0 and h+pos < height and w+pos < width:
-                for c in range(channel):
-                    mat[h, w, c*size2 : (c+1)*size2] = \
-                        np.asarray(image[h+neg:h+pos+1, w+pos:w+pos+1, c]).reshape(-1)
-    for c in range(channel):
-        mat[:, :, c*size2 : (c+1)*size2] -= np.mean(mat[:, :, c*size2 : (c+1)*size2], axis=2)[:, :, np.newaxis]
-    norm = np.linalg.norm(mat, axis=2)[:, :, np.newaxis]
-    for h in range(height):
-        for w in range(width):
-            if norm[h, w, 0] != 0:
-                mat[h, w, :] = mat[h, w, :] / norm[h, w, 0]
-    return mat
+            if h-ncc < 0 or h+ncc >= height or w-ncc < 0 or w+ncc >= width:
+                continue
+            temp = []
+            for c in range(channel):
+                W = image[h-ncc : h+ncc+1, w-ncc : w+ncc+1, c]
+                W = (W - np.mean(W)).reshape(-1)
+                temp.append(W)
+            allW = np.hstack(temp).reshape(-1)
+            norm = np.linalg.norm(allW)
+            if norm < 1e-7:
+                allW = np.zeros_like(allW)
+            else:
+                allW = allW / norm
+            normalized[h, w] = allW
+    return normalized
 
 
 def compute_ncc_impl(image1, image2):
@@ -272,24 +274,38 @@ def form_poisson_equation_impl(height, width, alpha, normals, depth_weight, dept
     # TODO Block Begin
     # fill row_ind,col_ind,data_arr,b
     # raise NotImplementedError()
+    row = 0
     if depth is not None:
-        for h in range(height):
-            for w in range(width):
-                if alpha[h, w] != 0:
-                    row_ind.append(h)
-                    col_ind.append(w)
+        for i in range(height):
+            for j in range(width):
+                if alpha[i, j] != 0:
+                    row_ind.append(row)
+                    row += 1
+                    col_ind.append(i*width+j)
                     data_arr.append(depth_weight)
-                    b.append(depth_weight*depth[h, w])
+                    b.append(depth_weight*depth[i, j])
     if normals is not None:
-        for h in range(height):
-            for w in range(width):
-                if alpha[h, w] != 0 and \
-                        (h+1 < height and alpha[h+1, w] != 0) and \
-                        (w+1 < width and alpha[h, w+1] != 0):
-                    row_ind.append(h)
-                    col_ind.append(w)
-                    data_arr.append(-normals[h, w, 2])
-                    b.append(normals[h, w, 0:1])
+        for i in range(height):
+            for j in range(width):
+                if alpha[i, j] != 0 and \
+                        (i+1 < height and j+1 < width) and \
+                        (alpha[i+1, j] != 0 and alpha[i, j+1] != 0):
+                    row_ind.append(row)
+                    col_ind.append(i*width+j)
+                    data_arr.append(-normals[i, j, 2])
+                    row_ind.append(row)
+                    col_ind.append(i*width+j+1)
+                    data_arr.append(normals[i, j, 2])
+                    row += 1
+                    b.append(normals[i, j, 0])
+                    row_ind.append(row)
+                    col_ind.append(i*width+j)
+                    data_arr.append(-normals[i, j, 2])
+                    row_ind.append(row)
+                    col_ind.append((i+1)*width+j)
+                    data_arr.append(normals[i, j, 2])
+                    row += 1
+                    b.append(-normals[i, j, 1])
     # TODO Block end
     # Convert all the lists to numpy array
     row_ind = np.array(row_ind, dtype=np.int32)
@@ -298,7 +314,5 @@ def form_poisson_equation_impl(height, width, alpha, normals, depth_weight, dept
     b = np.array(b, dtype=np.float32)
 
     # Create a compressed sparse matrix from indices and values
-    # A = csr_matrix((data_arr, (row_ind, col_ind)), shape=(row, width * height))
-    A = csr_matrix((data_arr, (row_ind, col_ind)), shape=(width, height))
-
+    A = csr_matrix((data_arr, (row_ind, col_ind)), shape=(row, width * height))
     return A, b
