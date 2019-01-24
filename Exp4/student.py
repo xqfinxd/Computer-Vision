@@ -42,11 +42,11 @@ def compute_photometric_stereo_impl(lights, images):
                 I = np.array([image[h, w, c] for image in images])
                 L = lights
                 G = np.dot(np.linalg.inv(np.dot(L.T, L)), np.dot(L.T, I))
-                kd = np.linalg.norm(G)
+                kd = abs(np.linalg.norm(G))
                 if kd < 1e-7:
-                    kd, N = 0, np.zeros((3, 1))
+                    N = np.zeros((3, 1))
                 else:
-                    N = G / np.linalg.norm(G)
+                    N = G / kd
                 albedo[h, w, c] = kd
                 normals[h, w] = N.reshape(-1)
     return albedo, normals
